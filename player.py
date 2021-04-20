@@ -86,13 +86,17 @@ class Player:
         action = actions[0] # Initial index is the optimal action.
         if action != [0]:
             # Remove cards from hand after playing the action.
-            self.hand = np.array(self.hand)
-            indexes = np.where(self.hand == action[0])[0]
-            indexes = indexes[0:len(action)]
-            self.hand = list(np.delete(self.hand, indexes))
+            self.play_cards(action)
             # If the player bombs, the value of the active card is 0.
             active_card = [0] if action == [2] else action
         return active_card
+    
+    # Remove cards from hand after playing the action.
+    def play_cards(self, action):
+        self.hand = np.array(self.hand)
+        indexes = np.where(self.hand == action[0])[0]
+        indexes = indexes[0:len(action)]
+        self.hand = list(np.delete(self.hand, indexes))
     
     def __str__(self):
         return f"{self.name}: {list(self.hand)}"
