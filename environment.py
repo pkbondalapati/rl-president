@@ -1,4 +1,5 @@
 import numpy as np
+from player import Player
 
 
 class Environment:
@@ -36,6 +37,7 @@ class Environment:
         probs = np.array(count)/sets
         choice = np.random.choice(len(self.players), 1, p=probs)[0]
         self.players = self.players[choice:] + self.players[:choice]
+        print(self.players)
     
     # Initialize the card game.
     def start_game(self):
@@ -69,20 +71,25 @@ class Environment:
                     if prev_card[0] == prior_card[0]:
                         counter += len(prior_card)
                 
-        return counter
+        return counter       
     
-    # Find player that has a valid completion.
-    def play_completions(self):
+    # Find player that has a valid completion and play that completion.
+    def play_completion(self):
         counter = self.get_prior_count() 
         if counter != 0:
             iter_ = len(self.history) - 1
             active_card = self.history[iter_]['Active Cards']
-            for player in self.players:
+            for index, player in enumerate(self.players):
                 hand = list(player.hand)
                 cards, counts = np.unique(hand, return_counts=True)
                 for card, count in zip(cards, counts):
-                    if card == active_card[0] and count + counter == 4:                       
-                        return player
+                    if card == active_card[0] and count + counter == 4:
+                        turn = index + 1
+                        print(f"{turn}: Completion\n {self.players} \n")
+                        action = np.repeat(card, count)
+                        player.play_cards(action)
+                        active_card = [0]
+                        self.update_history(turn, player, active_card)
     
     # Append play to the overall record of the card game.
     def update_history(self, turn, player, active_card):
@@ -92,30 +99,29 @@ class Environment:
                   'Hand': player.hand,
                   'Active Cards': active_card}
         self.history.append(record)
-    
+        
+    # Get next turn for the card game.
+    def next_turn(self, hold=False):
+        iter_ = len(self.history) - 1
+        turn = self.history[iter_]['Turn']
+        if not hold:
+            turn = (turn % len(self.players)) + 1
+        return turn
+        
     # Generate an episode of the game.
     def play(self, max_iter=100):
         active_card = self.start_game()
         player = self.players[0]
-        turn = 1
-        self.update_history(turn, player, active_card)
+        self.update_history(1, player, active_card)
         
         while len(self.players) > 1:
-                        
-            iter_ = len(self.history) - 1
-            turn = turn % len(self.players)
             
-            player = self.players[turn]
+            iter_ = len(self.history) - 1
+            turn = self.next_turn()
+            player = self.players[turn - 1]
             prev_card = self.history[iter_]['Active Cards']
             active_card = player.play_action(active_card)
-            
-            turn = turn + 1
             self.update_history(turn, player, active_card)
-            
-            if active_card == [0]:
-                turn -= 1
-            elif prev_card == active_card:
-                turn += 1
             
             if iter_ > max_iter:
                 break
