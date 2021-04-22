@@ -50,46 +50,51 @@ class Environment:
         player.hand = list(np.delete(hand, indexes))
         return active_card
     
-    # Returns the count of duplicate cards from the last three plays.
-    def get_prior_count(self):
-        if len(self.history) < 1:
+    # Returns the running card count of the past 'n' plays.
+    def previous_count(self, iter_, n, pass_):
+        length = len(self.history) - iter_
+        if iter_ < 0 or length > n:
             return 0
-        
-        iter_ = len(self.history) - 1
+
         active_card = self.history[iter_]['Active Cards']
-        counter = len(active_card)
-        
-        if len(self.history) > 1:
+        nonzero_action = active_card[0] != 0
+
+        if iter_ > 0:
             prev_card = self.history[iter_ - 1]['Active Cards']
+            match_cards = active_card[0] == prev_card[0]
+            pass_action = len(active_card) == len(prev_card) if pass_ else True
 
-            if active_card[0] == prev_card[0]:
-                counter += len(prev_card)
+            if match_cards and nonzero_action and pass_action:
+                basic_count = 1 if pass_ else len(active_card)
+                return basic_count + previous_count(iter_ - 1, n, pass_)
 
-                if len(self.history) > 2:
-                    prior_card = self.history[iter_ - 2]['Active Cards']
-
-                    if prev_card[0] == prior_card[0]:
-                        counter += len(prior_card)
-                
-        return counter       
+        default_count = 0 if pass_ else len(active_card)
+        return default_count
     
     # Find player that has a valid completion and play that completion.
     def play_completion(self):
-        counter = self.get_prior_count() 
-        if counter != 0:
-            iter_ = len(self.history) - 1
-            active_card = self.history[iter_]['Active Cards']
-            for index, player in enumerate(self.players):
-                hand = list(player.hand)
-                cards, counts = np.unique(hand, return_counts=True)
-                for card, count in zip(cards, counts):
-                    if card == active_card[0] and count + counter == 4:
-                        turn = index + 1
-                        print(f"{turn}: Completion\n {self.players} \n")
-                        action = np.repeat(card, count)
-                        player.play_cards(action)
-                        active_card = [0]
-                        self.update_history(turn, player, active_card)
+        iter_ = len(self.history) - 1
+        counter = self.previous_count(iter_, 3, False)
+        active_card = self.history[iter_]['Active Cards']
+        for index, player in enumerate(self.players):
+            hand = list(player.hand)
+            cards, counts = np.unique(hand, return_counts=True)
+            for card, count in zip(cards, counts):
+                if card == active_card[0] and count + counter == 4:
+                    turn = index + 1
+                    print(f"{turn}: Completion\n {self.players} \n")
+                    action = np.repeat(card, count)
+                    player.play_cards(action)
+                    active_card = [0]
+                    self.update_history(turn, player, active_card)
+    
+    # Returns True if a completion has been played, otherwise False.
+    def check_completion(self):
+        iter_ = len(self.history) - 1
+        counter = self.previous_count(iter_, 4, False)
+        if counter == 4:
+            return True
+        return False
     
     # Append play to the overall record of the card game.
     def update_history(self, turn, player, active_card):
@@ -101,10 +106,10 @@ class Environment:
         self.history.append(record)
         
     # Get next turn for the card game.
-    def next_turn(self, hold=False):
+    def next_turn(self):
         iter_ = len(self.history) - 1
         turn = self.history[iter_]['Turn']
-        if not hold:
+        if not self.check_completion:
             turn = (turn % len(self.players)) + 1
         return turn
         
@@ -116,6 +121,7 @@ class Environment:
         
         while len(self.players) > 1:
             
+            self.play_completion()
             iter_ = len(self.history) - 1
             turn = self.next_turn()
             player = self.players[turn - 1]
