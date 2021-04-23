@@ -2,10 +2,11 @@ import numpy as np
 
 
 class Player:
-    def __init__(self, name, hand):
+    def __init__(self, name, hand, rank='Person'):
         self.name = name
         self.hand = hand
-        self.rank = 'Person'
+        self.rank = rank
+        self.score = 0
         
     def get_actions(self, active_card):
         # Get all possible actions from the player's hand.
