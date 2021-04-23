@@ -12,14 +12,14 @@ class Environment:
         self.fails = []
     
     # Add player to environment.
-    def add_player(self, name):
-        player = Player(name, [])
+    def add_player(self, name, rank='Person'):
+        player = Player(name, [], rank)
         self.players.append(player)
     
     # Add multiple players to environment.
-    def add_players(self, names):
-        for name in names:
-            self.add_player(name)
+    def add_players(self, names, ranks):
+        for name, rank in zip(names, ranks):
+            self.add_player(name, rank)
     
     # Deal out cards to all players in the environment.
     def deal_cards(self):
@@ -29,6 +29,44 @@ class Environment:
         hands = np.array_split(deck, len(self.players))
         for player, hand in zip(self.players, hands):
             player.hand = sorted(hand)
+    
+    # Swap 'n' cards in relation to rank.
+    def trade(self, primary, secondary, n):
+        primary_hand = np.array(primary.hand)
+        primary_bombs = primary_hand[primary_hand == 2]
+        primary_hand = primary_hand[primary_hand != 2]
+        primary_trade = list(primary_hand[:n])
+        primary_hand = list(primary_bombs) + list(primary_hand[n:])
+        secondary_hand = np.array(secondary.hand)
+        secondary_bombs = secondary_hand[secondary_hand == 2]
+        secondary_hand = secondary_hand[secondary_hand != 2]
+        secondary_trade = list(secondary_hand[-n:])
+        secondary_hand = list(secondary_bombs) + list(secondary_hand[:-n])
+        primary.hand = sorted(primary_hand + secondary_trade)
+        secondary.hand = sorted(secondary_hand + primary_trade)
+    
+    # Trade cards according to the players' rank.
+    def trade_cards(self):
+        president, vice_president, vice_scrub, scrub = [None] * 4
+        for player in self.players:
+            # Get titles from players.
+            if player.rank == "President":
+                president = player
+            elif player.rank == "Vice President":
+                vice_president = player
+            elif player.rank == "Vice Scrub":
+                vice_scrub = player
+            elif player.rank == "Scrub":
+                scrub = player
+        
+        # Trade cards between president and scrub.
+        if all(player is not None 
+               for player in [president, scrub]):
+            n = 1 if len(self.players) < 4 else 2
+            self.trade(president, scrub, n)
+        elif all(player is not None 
+                 for player in [vice_president, vice_scrub]):
+            self.trade(vice_president, vice_scrub, n=1)
     
     # Reorder players such that the one with the three of clubs is first.
     def reorder_players(self):
@@ -44,6 +82,7 @@ class Environment:
     # Initialize the card game.
     def start_game(self):
         self.deal_cards()
+        self.trade_cards()
         self.reorder_players()
         player = self.players[0]
         hand = np.array(player.hand)
@@ -141,17 +180,26 @@ class Environment:
         players = self.ranks + self.players + self.fails
         president = players[0]
         president.rank = 'President'
+        president.score += 2
         scrub = players[-1]
         scrub.rank = 'Scrub'
         
         if len(players) > 3:
             vice_president = players[1]
             vice_president.rank = 'Vice President'
+            vice_president.score += 1
             vice_scrub = players[-2]
             vice_scrub.rank = 'Vice Scrub'
+            for i, player in enumerate(players[2:-2]):
+                player.rank = f'Person {i + 1}'
+        else:
+            for i, player in enumerate(players[1:-1]):
+                player.rank = f'Person {i + 1}'
         
         self.results = {player.rank: player.name 
                         for player in players}
+        players.sort(key=lambda x: x.name)
+        self.players = players
     
     # Append play to the overall record of the card game.
     def update_history(self, turn, player, action, active_card):
@@ -163,7 +211,7 @@ class Environment:
                   'Active Cards': active_card}
         self.history.append(record)
         
-    # Generate an episode of the game.
+    # Run an iteration of a single game.
     def play(self, max_iter=100):
         action = self.start_game()
         player = self.players[0]
@@ -186,6 +234,25 @@ class Environment:
                 break
         
         self.update_results()
+    
+    # Generate an episode of a card game session.
+    def get_episode(self, threshold):
+        scores = [player.score for player in self.players]
+        result_record = []
+        score_record = []
+        history_record = []
+        
+        while max(scores) < threshold:
+            self.play()
+            result_record.append(self.results)
+            history_record.append(self.history)
+            scores = [player.score for player in self.players]
+            score_record.append(scores)
+            self.history = []
+            self.ranks = []
+            self.fails = []
+        
+        return (result_record, score_record, history_record)
                 
     def __str__(self):
         return f"{self.results}"
