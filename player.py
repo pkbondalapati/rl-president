@@ -88,8 +88,8 @@ class Player:
             # Remove cards from hand after playing the action.
             self.play_cards(action)
             # If the player bombs, the value of the active card is 0.
-            active_card = [0] if action == [2] else action
-        return active_card
+            active_card = [0] if action == [2] or len(action) == 4 else action
+        return action, active_card
     
     # Remove cards from hand after playing the action.
     def play_cards(self, action):
