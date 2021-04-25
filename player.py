@@ -2,14 +2,14 @@ import numpy as np
 
 
 class Player:
-    def __init__(self, name, hand, rank='Person'):
+    def __init__(self, name, hand=[], rank='Person'):
         self.name = name
         self.hand = hand
         self.rank = rank
         self.score = 0
-        
-    def get_actions(self, active_card):
-        # Get all possible actions from the player's hand.
+    
+    # Get all legal actions from the player's hand. 
+    def get_legal_actions(self, active_card):
         playables, counts = np.unique(self.hand, return_counts=True)
         actions = [[0]] # By default, all players can choose to pass.
         for playable, count in zip(playables, counts):
@@ -19,8 +19,6 @@ class Player:
                 actions.append(list(np.repeat([playable], count)))
             else:
                 actions.append([playable])
-        
-        # Get all legal actions, given the active card.
         legal_actions = []
         for cards in actions:
             # Passing and playing 2s are legal actions.
@@ -58,9 +56,9 @@ class Player:
                 elif len(cards) == 1 and len(active_card) == 3:
                     if cards[0] == active_card[0]:
                         legal_actions.append(cards)
-                        
         return legal_actions
     
+    # Reorder actions such that the first index contains pseudo-optimal action.
     def reorder_actions(self, actions):
         # Given that the actions are already sorted by numerical value, 
         # reorder actions by length of card count.
@@ -80,9 +78,10 @@ class Player:
         else:
             actions = actions[1:len(actions)] + [[0]]
         return actions
-        
+    
+    # Play pseudo-optimal action given the active card. 
     def play_action(self, active_card):
-        actions = self.get_actions(active_card) # Get all actions.
+        actions = self.get_legal_actions(active_card) # Get all actions.
         actions = self.reorder_actions(actions) # Reorder actions.
         action = actions[0] # Initial index is the optimal action.
         if action != [0]:
@@ -91,7 +90,18 @@ class Player:
             # If the player bombs, the value of the active card is 0.
             active_card = [0] if action == [2] or len(action) == 4 else action
         return action, active_card
-    
+       
+    # Play pseudo-optimal action on completion event.
+    def play_completion_action(self, active_card):
+        action = list(np.repeat(active_card[0], 4 - len(active_card)))
+        hand = np.array(self.hand)
+        trim = hand[hand != 2]
+        trim = trim[trim != active_card[0]]
+        if len(trim) > 0 or 2 not in hand:
+            self.play_cards(action)
+            active_card = [0]
+        return action, active_card
+                
     # Remove cards from hand after playing the action.
     def play_cards(self, action):
         self.hand = np.array(self.hand)
