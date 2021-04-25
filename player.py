@@ -8,8 +8,8 @@ class Player:
         self.rank = rank
         self.score = 0
     
-    # Get all legal actions from the player's hand. 
-    def get_legal_actions(self, active_card):
+    # Get all playable actions from the player's hand.
+    def get_playables(self):
         playables, counts = np.unique(self.hand, return_counts=True)
         actions = [[0]] # By default, all players can choose to pass.
         for playable, count in zip(playables, counts):
@@ -19,6 +19,11 @@ class Player:
                 actions.append(list(np.repeat([playable], count)))
             else:
                 actions.append([playable])
+        return actions
+    
+    # Get all legal actions from the player's hand. 
+    def get_legal_actions(self, active_card):
+        actions = self.get_playables()
         legal_actions = []
         for cards in actions:
             # Passing and playing 2s are legal actions.
