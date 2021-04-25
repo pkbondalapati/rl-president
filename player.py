@@ -92,8 +92,8 @@ class Player:
         return action, active_card
        
     # Play pseudo-optimal action on completion event.
-    def play_completion_action(self, active_card):
-        action = list(np.repeat(active_card[0], 4 - len(active_card)))
+    def play_completion_action(self, active_card, count):
+        action = list(np.repeat(active_card[0], count))
         hand = np.array(self.hand)
         trim = hand[hand != 2]
         trim = trim[trim != active_card[0]]
