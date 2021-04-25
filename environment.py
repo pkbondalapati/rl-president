@@ -13,7 +13,7 @@ class Environment:
     
     # Add player to environment.
     def add_player(self, name, rank='Person'):
-        player = Player(name, [], rank)
+        player = Player(name, rank)
         self.players.append(player)
     
     # Add multiple players to environment.
@@ -37,11 +37,13 @@ class Environment:
         primary_hand = primary_hand[primary_hand != 2]
         primary_trade = list(primary_hand[:n])
         primary_hand = list(primary_bombs) + list(primary_hand[n:])
+        
         secondary_hand = np.array(secondary.hand)
         secondary_bombs = secondary_hand[secondary_hand == 2]
         secondary_hand = secondary_hand[secondary_hand != 2]
         secondary_trade = list(secondary_hand[-n:])
         secondary_hand = list(secondary_bombs) + list(secondary_hand[:-n])
+        
         primary.hand = sorted(primary_hand + secondary_trade)
         secondary.hand = sorted(secondary_hand + primary_trade)
     
@@ -103,7 +105,8 @@ class Environment:
         if iter_ > 0:
             prev_card = self.history[iter_ - 1]['Active Cards']
             match_cards = active_card[0] == prev_card[0]
-            pass_action = len(active_card) == len(prev_card) if pass_ else True
+            pass_action = len(active_card) == len(prev_card) \
+                if pass_ else True
 
             if match_cards and nonzero_action and pass_action:
                 basic_count = 1 if pass_ else len(active_card)
@@ -122,30 +125,35 @@ class Environment:
             cards, counts = np.unique(hand, return_counts=True)
             for card, count in zip(cards, counts):
                 if card == active_card[0] and count + counter == 4:
-                    turn = index + 1
-                    action = list(np.repeat(card, count))
-                    player.play_cards(action)
-                    active_card = [0]
-                    self.update_history(turn, player, action, active_card)
+                    action, active_card = \
+                    player.play_completion_action(active_card, count)
+                    if active_card == [0]:
+                        self.update_history(index + 1, player, 
+                                            action, active_card)
+                        self.score_players()
             
     # Get next turn for the card game.
     def get_next_turn(self):
         iter_ = len(self.history) - 1
+        name = self.history[iter_]['Name']
         hand = self.history[iter_]['Hand']
         action = self.history[iter_]['Action']
         active_card = self.history[iter_]['Active Cards']
         turn = self.history[iter_]['Turn']
         next_turn = (turn % len(self.players)) + 1
         
+        # Check if player finished.
+        if len(hand) == 0:
+            turn = max((turn % (len(self.players) + 1)), 1)
+        
         # Check if player skips.
-        if self.previous_count(iter_, 1, True) == 1:
+        elif self.previous_count(iter_, 1, True) == 1 and action != [0]:
             turn = (next_turn % len(self.players)) + 1
             
-        # Check if player does neither bombs nor completes or just passes.
-        elif (action != [2] and active_card != [0]) or \
-             action == [0] or len(hand) == 0:
+        # Check if player neither bombs nor completes or just passes.
+        elif (action != [2] and active_card != [0]) or action == [0]:
             turn = next_turn
-        
+            
         # Otherwise, return same turn.
         return turn
     
