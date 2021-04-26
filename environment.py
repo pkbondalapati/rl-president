@@ -1,5 +1,6 @@
 import numpy as np
 from player import Player
+from agent import Agent
 
 
 class Environment:
@@ -13,7 +14,8 @@ class Environment:
     
     # Add player to environment.
     def add_player(self, name, rank='Person'):
-        player = Player(name, rank)
+        player = Agent(self.max_cards, rank=rank) if name == 'Agent' \
+            else Player(name, rank)
         self.players.append(player)
     
     # Add multiple players to environment.
@@ -125,8 +127,11 @@ class Environment:
             cards, counts = np.unique(hand, return_counts=True)
             for card, count in zip(cards, counts):
                 if card == active_card[0] and count + counter == 4:
-                    action, active_card = \
-                    player.play_completion_action(active_card, count)
+                    if player.name == 'Agent':
+                        policy = player.get_random_completion_policy(active_card, count)
+                        action, active_card = player.play_completion_action(policy, active_card)
+                    else:
+                        action, active_card = player.play_completion_action(active_card, count)
                     if active_card == [0]:
                         self.update_history(index + 1, player, 
                                             action, active_card)
@@ -233,7 +238,11 @@ class Environment:
             turn = self.get_next_turn()
             player = self.players[turn - 1]
             active_card = self.history[iter_]['Active Cards']
-            action, active_card = player.play_action(active_card)
+            if player.name == 'Agent':
+                policy = player.get_random_policy(active_card)
+                action, active_card = player.play_action(policy, active_card)
+            else:
+                action, active_card = player.play_action(active_card)
             self.update_history(turn, player, action, active_card)
             self.clear_pile()
             self.score_players()
