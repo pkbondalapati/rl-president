@@ -9,6 +9,8 @@ class Environment:
         self.players = []
         self.history = []
         self.results = []
+        self.vectors = []
+        self.shadows = []
         self.ranks = []
         self.fails = []
     
@@ -17,6 +19,7 @@ class Environment:
         player = Agent(self.max_cards, rank=rank) if name == 'Agent' \
             else Player(name, rank)
         self.players.append(player)
+        self.shadows.append(player)
     
     # Add multiple players to environment.
     def add_players(self, names, ranks):
@@ -186,6 +189,7 @@ class Environment:
                 self.ranks.append(player)
             
             # Remove player from the environment.
+            self.update_shadows()
             self.players.remove(player)
     
     # Rank all players after the card game.
@@ -223,7 +227,20 @@ class Environment:
                   'Action': action,
                   'Active Cards': active_card}
         self.history.append(record)
-        
+        self.update_shadows()
+    
+    # Append vector to the list of vectors.
+    def update_vectors(self, player, active_card, action=[]):
+        vector = self.vectorize(player.hand, active_card, action)
+        self.vectors.append(vector)
+    
+    # Updates the Player object's copy. 
+    def update_shadows(self):
+        for player in self.players:
+            for shadow in self.shadows:
+                if player.name == shadow.name:
+                    shadow = player
+                
     # Run an iteration of a single game.
     def play(self, max_iter=100):
         action = self.start_game()
@@ -239,6 +256,7 @@ class Environment:
             player = self.players[turn - 1]
             active_card = self.history[iter_]['Active Cards']
             if player.name == 'Agent':
+                self.update_vectors(player, active_card)
                 policy = player.get_random_policy(active_card)
                 action, active_card = player.play_action(policy, active_card)
             else:
@@ -270,7 +288,38 @@ class Environment:
             self.fails = []
         
         return (result_record, score_record, history_record)
-                
+    
+    # Convert hand to vector.
+    def hand2vec(self, hand):
+        vector = list(np.zeros(13, dtype=int))
+        suite = list(range(2, 15))
+        values, counts = np.unique(hand, return_counts=True)
+        indexes = [(suite.index(v), c) for v, c in zip(values, counts)]
+        for index, count in indexes:
+            vector[index] = count
+        return vector
+    
+    # Convert cards to vector.
+    def card2vec(self, cards):
+        if len(cards) == 0:
+            return []
+        values, counts = np.unique(cards, return_counts=True)
+        assert len(values) == 1 and len(counts) == 1, 'Invalid card/action.'
+        return [values[0], counts[0]]
+    
+    # Convert players' card counts to vector.
+    def count2vec(self):
+        return [len(p.hand) for p in self.shadows if p.name != 'Agent']
+    
+    # Returns a list of card counts for values 2 to 14.
+    def vectorize(self, hand, active_card, action=[]):
+        hand_vec = self.hand2vec(hand)
+        card_vec = self.card2vec(active_card)
+        count_vec = self.count2vec()
+        action_vec = self.card2vec(action) if len(action) == 0 else action
+        vector = hand_vec + card_vec + count_vec + action_vec
+        return vector
+    
     def __str__(self):
         return f"{self.results}"
     
