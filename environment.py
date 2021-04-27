@@ -10,6 +10,7 @@ class Environment:
         self.history = []
         self.results = []
         self.vectors = []
+        self.rewards = []
         self.shadows = []
         self.ranks = []
         self.fails = []
@@ -232,7 +233,9 @@ class Environment:
     # Append vector to the list of vectors.
     def update_vectors(self, player, active_card, action=[]):
         vector = self.vectorize(player.hand, active_card, action)
+        reward = self.get_reward(vector)
         self.vectors.append(vector)
+        self.rewards.append(reward)
     
     # Updates the Player object's copy. 
     def update_shadows(self):
@@ -317,9 +320,15 @@ class Environment:
         card_vec = self.card2vec(active_card)
         count_vec = self.count2vec()
         action_vec = self.card2vec(action) if len(action) == 0 else action
-        vector = hand_vec + card_vec + count_vec + action_vec
+        vector = hand_vec + card_vec + action_vec + count_vec
         return vector
     
+    # Get reward from vector representation of (state, action).
+    def get_reward(self, vector):
+        card_count = sum(vector[0:13])
+        players_count = vector[-len(self.shadows):]
+        return 1 if (card_count == 0 and 0 not in players_count) else 0
+        
     def __str__(self):
         return f"{self.results}"
     
