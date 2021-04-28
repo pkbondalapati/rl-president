@@ -312,16 +312,14 @@ class Environment:
                 values = [self.evaluate_Q(vector)
                           for vector in vectors]
                 
-                action = player.epsilon_greedy(0.1, actions, values)
+                action = player.epsilon_greedy(0.2, actions, values)
                 active_card = [0] if action != [0] else active_card
                 self.completion = True if action == [0] else False
                 
                 state_action = self.vectorize(player.hand, [0], action)
                 reward = self.get_reward(state_action)
                 self.rewards.append(reward)
-                
                 self.records.append(state_action)
-                print('Completion Event')
                 
                 if action != [0]:
                     player.play_cards(action)                    
@@ -337,25 +335,23 @@ class Environment:
             player = self.players[turn - 1]
             active_card = self.history[iter_]['Active Cards']
             if player.name == 'Agent':
-                actions = player.get_playables()
+                actions = player.get_legal_actions(active_card)
                 vectors = [self.vectorize(player.hand, 
                                           active_card, action)
                            for action in actions]
                 values = [self.evaluate_Q(vector)
                           for vector in vectors]
-                action = player.epsilon_greedy(0.1, actions, values)
+                action = player.epsilon_greedy(0.2, actions, values)
                 player.play_cards(action)
-                active_card = [0] if (action == [2] or 
-                                      len(action) == 4) else action
+                if action != [0]:
+                    active_card = [0] if (action == [2] or 
+                                          len(action) == 4) else action
                 
-                state_action = self.vectorize(player.hand, [0], action)
+                state_action = self.vectorize(player.hand, active_card, action)
                 reward = self.get_reward(state_action)
                 self.rewards.append(reward)
-                
                 self.records.append(state_action)
-                print('Cards Played')
 
-                self.update_vectors(player, active_card)
                 self.update_history(turn, player, action, active_card)
                 self.clear_pile()
                 self.score_players()
@@ -369,14 +365,51 @@ class Environment:
     # Returns output from the action-value function.
     def evaluate_Q(self, vector):
         if len(self.weights) == 0:
-            self.weights = np.random.normal(0.01, 0.05, 20)
+            self.weights = np.zeros(21)
+#             self.weights = np.ones(20)
+#             self.weights = np.random.normal(0.01, 0.05, 20)
         assert len(vector) == len(self.weights), 'Mismatch of vector length.'
         return np.dot(np.array(self.weights).T, np.array(vector))
     
     # Runs SARSA for a specified number of episodes.
-    def sarsa(self, q, alpha, max_episodes=1):
+    def sarsa(self, alpha, gamma, max_episodes=1):
         for _ in range(max_episodes):
-            pass
+            # Initial State
+            self.play_step()
+            prev_vector = np.array(self.records[-1])
+            
+            counter = 0
+            while counter < len(self.rewards):
+                self.play_step()
+                next_vector = np.array(self.records[-1])
+                reward = self.rewards[-1]
+                
+                prev_value = self.evaluate_Q(prev_vector)
+                next_value = self.evaluate_Q(next_vector)
+                
+                self.weights = self.weights + alpha * \
+                    (reward + gamma * next_value - prev_value) * \
+                    prev_vector
+                
+                prev_vector = next_vector
+                counter += 1
+            
+            # Terminal State
+            self.weights = self.weights + alpha * \
+                (reward - prev_value) * prev_vector
+            
+            # Reset Game
+            self.reset()
+    
+    def reset(self):
+        self.players = self.shadows
+        self.history = []
+        self.results = []
+        self.records = []
+        self.rewards = []
+        self.ranks = []
+        self.fails = []
+        self.completion = False
     
     # Generate an episode of a card game session.
     def get_episode(self, threshold):
@@ -425,14 +458,22 @@ class Environment:
         card_vec = self.card2vec(active_card)
         count_vec = self.count2vec()
         action_vec = self.card2vec(action) if len(action) != 0 else action
-        vector = hand_vec + card_vec + action_vec + count_vec
+        vector = [1] + hand_vec + card_vec + action_vec + count_vec
         return vector
     
     # Get reward from vector representation of (state, action).
     def get_reward(self, vector):
         card_count = sum(vector[0:13])
         players_count = vector[-len(self.shadows):]
-        return 1 if (card_count == 0 and 0 not in players_count) else 0
+        reward = 0
+        if card_count == 0:
+            reward += 1
+        nonzeros = len(np.nonzero(players_count)[0])
+        if card_count == 0 and nonzeros == 3:
+            reward += 1
+        elif nonzeros == 1:
+            reward = -2
+        return reward
         
     def __str__(self):
         return f"{self.results}"
