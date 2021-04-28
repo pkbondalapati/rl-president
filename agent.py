@@ -64,6 +64,18 @@ class Agent(Player):
         policy[indexes] = 1/2
         return policy
     
+    # Returns an action following an epsilon greedy policy.
+    def epsilon_greedy(self, epsilon, actions, values):
+        assert len(actions) == len(values), 'Mismatch of Q values.'
+        # Exploitation
+        if np.random.random() >= epsilon:
+            index = np.array(values).argmax()
+            return actions[index]
+        # Exploration
+        else:
+            choice = np.random.choice(range(len(actions)))
+            return actions[choice]
+    
     # Play action given the policy and active card. 
     def play_action(self, policy, active_card):
         actions = self.get_all_actions() # Get all actions.
