@@ -16,6 +16,7 @@ class Environment:
         self.shadows = []
         self.ranks = []
         self.fails = []
+        self.completion = False
     
     # Add player to environment.
     def add_player(self, name, rank='Person'):
@@ -250,7 +251,6 @@ class Environment:
         vector = self.vectorize(player.hand, active_card, action)
         reward = self.get_reward(vector)
         self.vectors.append(vector)
-        self.rewards.append(reward)
     
     # Updates the Player object's copy. 
     def update_shadows(self):
@@ -301,54 +301,82 @@ class Environment:
             iter_ = len(self.history) - 1
             active_card = self.history[iter_]['Active Cards']
             
-            if self.has_completion():
-                agent = [p for p in self.players if p.name == 'Agent'][0]
-                hand = np.array(agent.hand)
+            if self.has_completion() and not self.completion:
+                player = [p for p in self.players if p.name == 'Agent'][0]
+                hand = np.array(player.hand)
                 count = len(hand[hand == active_card[0]])
-                actions = agent.get_completion_actions(active_card, count)
+                
+                actions = player.get_completion_actions(active_card, count)
                 vectors = [self.vectorize(hand, active_card, action) 
                            for action in actions]
-                self.records.append(vectors)
-                print('Completion')
-                policy = agent.get_random_completion_policy(active_card, 
-                                                            count)
-                action, active_card = \
-                agent.play_completion_action(policy, active_card)
-                if active_card == [0]:
-                    index = self.players.index(agent)
-                    self.update_history(index + 1, agent, 
+                values = [self.evaluate_Q(vector)
+                          for vector in vectors]
+                
+                action = player.epsilon_greedy(0.1, actions, values)
+                active_card = [0] if action != [0] else active_card
+                self.completion = True if action == [0] else False
+                
+                state_action = self.vectorize(player.hand, [0], action)
+                reward = self.get_reward(state_action)
+                self.rewards.append(reward)
+                
+                self.records.append(state_action)
+                print('Completion Event')
+                
+                if action != [0]:
+                    player.play_cards(action)                    
+                    index = self.players.index(player)
+                    self.update_history(index + 1, player, 
                                         action, active_card)
                     self.score_players()
                 break
+            
+            self.completion = False
+            self.play_completion()
+            turn = self.get_next_turn()
+            player = self.players[turn - 1]
+            active_card = self.history[iter_]['Active Cards']
+            if player.name == 'Agent':
+                actions = player.get_playables()
+                vectors = [self.vectorize(player.hand, 
+                                          active_card, action)
+                           for action in actions]
+                values = [self.evaluate_Q(vector)
+                          for vector in vectors]
+                action = player.epsilon_greedy(0.1, actions, values)
+                player.play_cards(action)
+                active_card = [0] if (action == [2] or 
+                                      len(action) == 4) else action
+                
+                state_action = self.vectorize(player.hand, [0], action)
+                reward = self.get_reward(state_action)
+                self.rewards.append(reward)
+                
+                self.records.append(state_action)
+                print('Cards Played')
+
+                self.update_vectors(player, active_card)
+                self.update_history(turn, player, action, active_card)
+                self.clear_pile()
+                self.score_players()
+                break
             else:
-                self.play_completion()
-                turn = self.get_next_turn()
-                player = self.players[turn - 1]
-                active_card = self.history[iter_]['Active Cards']
-                if player.name == 'Agent':
-                    actions = player.get_playables()
-                    vectors = [self.vectorize(player.hand, 
-                                              active_card, action)
-                               for action in actions]
-                    self.records.append(vectors)
-                    print('Cards Played')
-                    self.update_vectors(player, active_card)
-                    policy = player.get_random_policy(active_card)
-                    action, active_card = player.play_action(policy, 
-                                                             active_card)
-                    self.update_history(turn, player, action, active_card)
-                    self.clear_pile()
-                    self.score_players()
-                    break
-                else:
-                    action, active_card = player.play_action(active_card)
-                    self.update_history(turn, player, action, active_card)
-                    self.clear_pile()
-                    self.score_players()
-                    
+                action, active_card = player.play_action(active_card)
+                self.update_history(turn, player, action, active_card)
+                self.clear_pile()
+                self.score_players()
     
-    def esg_sarsa(self, q, alpha, epsilon):
-        pass
+    # Returns output from the action-value function.
+    def evaluate_Q(self, vector):
+        if len(self.weights) == 0:
+            self.weights = np.random.normal(0.01, 0.05, 20)
+        assert len(vector) == len(self.weights), 'Mismatch of vector length.'
+        return np.dot(np.array(self.weights).T, np.array(vector))
+    
+    # Runs SARSA for a specified number of episodes.
+    def sarsa(self, q, alpha, max_episodes=1):
+        for _ in range(max_episodes):
+            pass
     
     # Generate an episode of a card game session.
     def get_episode(self, threshold):
