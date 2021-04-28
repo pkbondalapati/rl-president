@@ -25,7 +25,7 @@ class Agent(Player):
         actions = [[0], [2]] + single_cards + double_cards + \
                   triple_cards + quad_cards
         return actions
-    
+        
     # Get all possible playable actions from the hand.
     def get_playables(self):
         playables, counts = np.unique(self.hand, return_counts=True)
@@ -40,6 +40,11 @@ class Agent(Player):
                 actions.append([playable])
         return actions
     
+    # Returns all legal actions on a completion event.
+    def get_completion_actions(self, active_card, count):
+        playable = list(np.repeat(active_card[0], count))
+        return [[0], playable]
+    
     # Get random policy from a given hand and active card.
     def get_random_policy(self, active_card):
         actions = self.get_all_actions()
@@ -53,9 +58,9 @@ class Agent(Player):
     def get_random_completion_policy(self, active_card, count):
         actions = self.get_all_actions()
         policy = np.zeros(len(actions))
-        playable = list(np.repeat(active_card[0], count))
+        playables = self.get_completion_actions(active_card, count)
         indexes = [actions.index(action) for action
-                   in [[0], playable]]
+                   in playables]
         policy[indexes] = 1/2
         return policy
     
