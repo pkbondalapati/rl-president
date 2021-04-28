@@ -10,6 +10,8 @@ class Environment:
         self.history = []
         self.results = []
         self.vectors = []
+        self.weights = []
+        self.records = []
         self.rewards = []
         self.shadows = []
         self.ranks = []
@@ -121,25 +123,38 @@ class Environment:
         default_count = 0 if pass_ else len(active_card)
         return default_count
     
-    # Find player that has a valid completion and play that completion.
-    def play_completion(self):
+    # Returns true if agent has a valid completion, otherwise false.
+    def has_completion(self):
         iter_ = len(self.history) - 1
         counter = self.previous_count(iter_, 3, False)
         active_card = self.history[iter_]['Active Cards']
-        for index, player in enumerate(self.players):
-            hand = list(player.hand)
+        agents = [p for p in self.players if p.name == 'Agent']
+        if len(agents) != 0:
+            hand = list(agents[0].hand)
             cards, counts = np.unique(hand, return_counts=True)
             for card, count in zip(cards, counts):
                 if card == active_card[0] and count + counter == 4:
-                    if player.name == 'Agent':
-                        policy = player.get_random_completion_policy(active_card, count)
-                        action, active_card = player.play_completion_action(policy, active_card)
-                    else:
-                        action, active_card = player.play_completion_action(active_card, count)
-                    if active_card == [0]:
-                        self.update_history(index + 1, player, 
-                                            action, active_card)
-                        self.score_players()
+                    return True
+        return False
+    
+    # Find player that has a valid completion and play that completion.
+    def play_completion(self):
+        if not self.has_completion():
+            iter_ = len(self.history) - 1
+            counter = self.previous_count(iter_, 3, False)
+            active_card = self.history[iter_]['Active Cards']
+            for index, player in enumerate(self.players):
+                hand = list(player.hand)
+                cards, counts = np.unique(hand, return_counts=True)
+                for card, count in zip(cards, counts):
+                    if card == active_card[0] and count + counter == 4:
+                        action, active_card = \
+                        player.play_completion_action(active_card, count)                        
+                        if active_card == [0]:
+                            index = self.players.index(player)
+                            self.update_history(index + 1, player, 
+                                                action, active_card)
+                            self.score_players()
             
     # Get next turn for the card game.
     def get_next_turn(self):
@@ -243,13 +258,17 @@ class Environment:
             for shadow in self.shadows:
                 if player.name == shadow.name:
                     shadow = player
-                
-    # Run an iteration of a single game.
-    def play(self, max_iter=100):
+    
+    # Starts game and updates history.
+    def initialize(self):
         action = self.start_game()
         player = self.players[0]
         active_card = action 
         self.update_history(1, player, action, active_card)
+    
+    # Run an iteration of a single game.
+    def play(self, max_iter=100):
+        self.initialize()
         
         while len(self.players) > 1:
             
@@ -272,6 +291,64 @@ class Environment:
                 break
         
         self.update_results()
+    
+    # Play a single step of in the episode.
+    def play_step(self):
+        if len(self.history) == 0:
+            self.initialize()
+        
+        while len(self.players) > 1:
+            iter_ = len(self.history) - 1
+            active_card = self.history[iter_]['Active Cards']
+            
+            if self.has_completion():
+                agent = [p for p in self.players if p.name == 'Agent'][0]
+                hand = np.array(agent.hand)
+                count = len(hand[hand == active_card[0]])
+                actions = agent.get_completion_actions(active_card, count)
+                vectors = [self.vectorize(hand, active_card, action) 
+                           for action in actions]
+                self.records.append(vectors)
+                print('Completion')
+                policy = agent.get_random_completion_policy(active_card, 
+                                                            count)
+                action, active_card = \
+                agent.play_completion_action(policy, active_card)
+                if active_card == [0]:
+                    index = self.players.index(agent)
+                    self.update_history(index + 1, agent, 
+                                        action, active_card)
+                    self.score_players()
+                break
+            else:
+                self.play_completion()
+                turn = self.get_next_turn()
+                player = self.players[turn - 1]
+                active_card = self.history[iter_]['Active Cards']
+                if player.name == 'Agent':
+                    actions = player.get_playables()
+                    vectors = [self.vectorize(player.hand, 
+                                              active_card, action)
+                               for action in actions]
+                    self.records.append(vectors)
+                    print('Cards Played')
+                    self.update_vectors(player, active_card)
+                    policy = player.get_random_policy(active_card)
+                    action, active_card = player.play_action(policy, 
+                                                             active_card)
+                    self.update_history(turn, player, action, active_card)
+                    self.clear_pile()
+                    self.score_players()
+                    break
+                else:
+                    action, active_card = player.play_action(active_card)
+                    self.update_history(turn, player, action, active_card)
+                    self.clear_pile()
+                    self.score_players()
+                    
+    
+    def esg_sarsa(self, q, alpha, epsilon):
+        pass
     
     # Generate an episode of a card game session.
     def get_episode(self, threshold):
@@ -319,7 +396,7 @@ class Environment:
         hand_vec = self.hand2vec(hand)
         card_vec = self.card2vec(active_card)
         count_vec = self.count2vec()
-        action_vec = self.card2vec(action) if len(action) == 0 else action
+        action_vec = self.card2vec(action) if len(action) != 0 else action
         vector = hand_vec + card_vec + action_vec + count_vec
         return vector
     
