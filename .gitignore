@@ -1,3 +1,8 @@
 .ipynb_checkpoints
 __pycache__
+figures
 Implementation.ipynb
+agent.py
+environment.py
+game_setup.py
+*.ipynb
