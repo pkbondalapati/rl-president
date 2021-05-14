@@ -8,6 +8,25 @@ class Player:
         self.rank = rank
         self.score = 0
     
+    # Get all active cards, given 'n' card count.
+    def get_cards(self, n):
+        unique_cards = np.arange(3, 15)
+        cards = np.repeat(unique_cards, n)
+        cards = np.array_split(cards, len(unique_cards))
+        cards = np.array(cards).tolist()
+        return cards
+    
+    # Get all possible actions from the deck.
+    def get_all_actions(self):
+        unique_cards = np.arange(3, 15)
+        single_cards = [[card] for card in unique_cards]
+        double_cards = self.get_cards(2)
+        triple_cards = self.get_cards(3)
+        quad_cards = self.get_cards(4)
+        actions = [[0], [2]] + single_cards + double_cards + \
+                  triple_cards + quad_cards
+        return actions    
+    
     # Get all playable actions from the player's hand.
     def get_playables(self):
         playables, counts = np.unique(self.hand, return_counts=True)
@@ -85,10 +104,14 @@ class Player:
         return actions
     
     # Play pseudo-optimal action given the active card. 
-    def play_action(self, active_card):
+    def play_action(self, active_card, random=False):
         actions = self.get_legal_actions(active_card) # Get all actions.
-        actions = self.reorder_actions(actions) # Reorder actions.
-        action = actions[0] # Initial index is the optimal action.
+        if random:
+            index = np.random.choice(range(len(actions)))
+            action = actions[index]
+        else:
+            actions = self.reorder_actions(actions) # Reorder actions.
+            action = actions[0] # Initial index is the optimal action.
         if action != [0]:
             # Remove cards from hand after playing the action.
             self.play_cards(action)
@@ -97,7 +120,7 @@ class Player:
         return action, active_card
        
     # Play pseudo-optimal action on completion event.
-    def play_completion_action(self, active_card, count):
+    def play_completion(self, active_card, count):
         action = list(np.repeat(active_card[0], count))
         hand = np.array(self.hand)
         trim = hand[hand != 2]
