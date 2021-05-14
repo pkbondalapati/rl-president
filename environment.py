@@ -108,11 +108,11 @@ class Environment:
         if iter_ < 0 or length > n:
             return 0
 
-        active_card = self.history[iter_]['Active Cards']
+        active_card = self.history[iter_]['Target']
         nonzero_action = active_card[0] != 0
 
         if iter_ > 0:
-            prev_card = self.history[iter_ - 1]['Active Cards']
+            prev_card = self.history[iter_ - 1]['Target']
             match_cards = active_card[0] == prev_card[0]
             pass_action = len(active_card) == len(prev_card) \
                 if pass_ else True
@@ -128,7 +128,7 @@ class Environment:
     def has_completion(self):
         iter_ = len(self.history) - 1
         counter = self.previous_count(iter_, 3, False)
-        active_card = self.history[iter_]['Active Cards']
+        active_card = self.history[iter_]['Target']
         agents = [p for p in self.players if p.name == 'Agent']
         if len(agents) != 0:
             hand = list(agents[0].hand)
@@ -143,14 +143,14 @@ class Environment:
         if not self.has_completion():
             iter_ = len(self.history) - 1
             counter = self.previous_count(iter_, 3, False)
-            active_card = self.history[iter_]['Active Cards']
+            active_card = self.history[iter_]['Target']
             for index, player in enumerate(self.players):
                 hand = list(player.hand)
                 cards, counts = np.unique(hand, return_counts=True)
                 for card, count in zip(cards, counts):
                     if card == active_card[0] and count + counter == 4:
                         action, active_card = \
-                        player.play_completion_action(active_card, count)                        
+                        player.play_completion(active_card, count)                        
                         if active_card == [0]:
                             index = self.players.index(player)
                             self.update_history(index + 1, player, 
@@ -163,7 +163,7 @@ class Environment:
         name = self.history[iter_]['Name']
         hand = self.history[iter_]['Hand']
         action = self.history[iter_]['Action']
-        active_card = self.history[iter_]['Active Cards']
+        active_card = self.history[iter_]['Target']
         turn = self.history[iter_]['Turn']
         next_turn = (turn % len(self.players)) + 1
         
@@ -190,7 +190,7 @@ class Environment:
             prev_actions = [self.history[i]['Action'] 
                             for i in range(iter_, iter_ - count, -1)]
             if all(action == [0] for action in prev_actions):
-                self.history[iter_]['Active Cards'] = [0]
+                self.history[iter_]['Target'] = [0]
     
     # Track players that have finished the card game.
     def score_players(self):
@@ -242,7 +242,7 @@ class Environment:
                   'Name': player.name,
                   'Hand': player.hand,
                   'Action': action,
-                  'Active Cards': active_card}
+                  'Target': active_card}
         self.history.append(record)
         self.update_shadows()
     
@@ -276,7 +276,7 @@ class Environment:
             iter_ = len(self.history) - 1
             turn = self.get_next_turn()
             player = self.players[turn - 1]
-            active_card = self.history[iter_]['Active Cards']
+            active_card = self.history[iter_]['Target']
             if player.name == 'Agent':
                 self.update_vectors(player, active_card)
                 policy = player.get_random_policy(active_card)
@@ -299,7 +299,7 @@ class Environment:
         
         while len(self.players) > 1:
             iter_ = len(self.history) - 1
-            active_card = self.history[iter_]['Active Cards']
+            active_card = self.history[iter_]['Target']
             
             if self.has_completion() and not self.completion:
                 player = [p for p in self.players if p.name == 'Agent'][0]
@@ -333,7 +333,7 @@ class Environment:
             self.play_completion()
             turn = self.get_next_turn()
             player = self.players[turn - 1]
-            active_card = self.history[iter_]['Active Cards']
+            active_card = self.history[iter_]['Target']
             if player.name == 'Agent':
                 actions = player.get_legal_actions(active_card)
                 vectors = [self.vectorize(player.hand, 
