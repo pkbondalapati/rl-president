@@ -12,7 +12,7 @@ May 14, 2021
 
 ## Abstract
 
-Since its inception, reinforcement learning has been closely tied to games. Even in highly complex games with a vast number of possible scenarios, reinforcement learning agents often have been able to learn remarkably well, exceeding the abilities of the best human players alive. Deep Q-learning is one method that uses a neural network to estimate the complex state-value functions that arise in such games. In this paper, we apply deep Q-learning to the President card game. We find that our agent is easily able to beat opponents following a random strategy, but struggles to consistently outperform opponents following a more informed strategy.
+Since its inception, reinforcement learning has been closely tied to games. Even in highly complex games with a vast number of possible scenarios, reinforcement learning agents often have been able to learn remarkably well, exceeding the abilities of the best human players alive. Deep Q-learning is one method that uses a neural network to estimate the complex state-value functions that arise in such games. In this [paper](./docs/paper.pdf), we apply deep Q-learning to the President card game. We find that our agent is easily able to beat opponents following a random strategy, but struggles to consistently outperform opponents following a more informed strategy.
 
 ## Usage
 
@@ -21,4 +21,3 @@ Since its inception, reinforcement learning has been closely tied to games. Even
 3. Adjust hyperparameters (if necessary).
 4. Execute 'run.py' in terminal.
 5. Open './figures/' folder to view performance.
-
